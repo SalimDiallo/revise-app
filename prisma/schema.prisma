@@ -15,7 +15,6 @@ datasource db {
 // datasource db {
 //   provider = "postgresql"
 //   url      = env("POSTGRES_PRISMA_URL") // uses connection pooling
-//   // directUrl = env("POSTGRES_URL_NON_POOLING")
 // }
 
 model User {
@@ -24,47 +23,111 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  password      String?   // Pour l'authentification email/mot de passe
+  password      String?
   usageMax      Int       @default(3)
+  createdAt     DateTime  @default(now())
 
-  accounts Account[]
-  sessions Session[]
-  reviews  Review[]
-  allquizz Quizz[]
+  accounts  Account[]
+  sessions  Session[]
+  reviews   Review[]
+  quizzes   Quiz[]
+  quizResults QuizResult[]
+  categories Category[]
 }
 
-model Quizz {
-  id        String     @id @default(cuid())
-  questions Question[]
-
-  userId String
-  User   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+// Quiz sauvegardé
+model Quiz {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  sourceText  String   // Texte source utilisé pour générer
+  category    Category? @relation(fields: [categoryId], references: [id])
+  categoryId  String?
+  questions   Question[]
+  results     QuizResult[]
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
+// Question d'un quiz
 model Question {
-  id            String @id @default(cuid())
-  textQuestion  String
+  id            String   @id @default(cuid())
+  text          String
+  options       String   // JSON array des options
   correctAnswer String
-  optionA       String
-  optionB       String
-  optionC       String
-  optionD       String
+  explication   String?
+  order         Int      @default(0)
+  
+  quizId        String
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  // Pour la révision espacée
+  userAnswers   UserAnswer[]
+}
 
-  quizzId String
-  quizz   Quizz  @relation(references: [id], fields: [quizzId], onDelete: Cascade)
+// Résultat d'un quiz complété
+model QuizResult {
+  id          String   @id @default(cuid())
+  score       Int      // Nombre de bonnes réponses
+  totalQuestions Int
+  percentage  Float
+  duration    Int?     // Durée en secondes
+  mode        String   @default("normal") // "normal", "timed", "revision"
+  
+  quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  answers     UserAnswer[]
+  
+  completedAt DateTime @default(now())
+}
+
+// Réponse de l'utilisateur à une question
+model UserAnswer {
+  id          String   @id @default(cuid())
+  answer      String   // Réponse donnée
+  isCorrect   Boolean
+  timeSpent   Int?     // Temps passé sur la question en secondes
+  
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  resultId    String
+  result      QuizResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+}
+
+// Catégorie pour organiser les quiz
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  color       String   @default("#6366f1") // Couleur hex
+  icon        String?  // Nom d'icône lucide
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  quizzes     Quiz[]
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([name, userId])
 }
 
 model Review {
   id      String @id @default(cuid())
   content String
-
-  userId String
-
-  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  User    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// next auth models
-
+// NextAuth models
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -78,7 +141,6 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
   refresh_token_expires_in Float?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
