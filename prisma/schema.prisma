@@ -1,0 +1,103 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Configuration SQLite pour les tests locaux
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Configuration PostgreSQL pour la production (décommenter pour déploiement)
+// datasource db {
+//   provider = "postgresql"
+//   url      = env("POSTGRES_PRISMA_URL") // uses connection pooling
+//   // directUrl = env("POSTGRES_URL_NON_POOLING")
+// }
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // Pour l'authentification email/mot de passe
+  usageMax      Int       @default(3)
+
+  accounts Account[]
+  sessions Session[]
+  reviews  Review[]
+  allquizz Quizz[]
+}
+
+model Quizz {
+  id        String     @id @default(cuid())
+  questions Question[]
+
+  userId String
+  User   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Question {
+  id            String @id @default(cuid())
+  textQuestion  String
+  correctAnswer String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+
+  quizzId String
+  quizz   Quizz  @relation(references: [id], fields: [quizzId], onDelete: Cascade)
+}
+
+model Review {
+  id      String @id @default(cuid())
+  content String
+
+  userId String
+
+  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// next auth models
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  refresh_token_expires_in Float?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
